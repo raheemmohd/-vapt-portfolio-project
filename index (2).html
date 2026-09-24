@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web Application Security Testing Lab — Recon to Remediation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F6F9; --paper-dim: #ECEEF3; --grid: #DDE1EA; --ink: #171B2E; --ink-soft: #4A4F68;
+    --line: #C7CCDA; --crit: #B4392E; --crit-bg: #F7DEDA; --high: #C8722C; --high-bg: #F8E4CE;
+    --med: #C6A324; --med-bg: #F6EDC6; --low: #3E8F5C; --low-bg: #DBEFE1;
+    --wire: #4A3F94; --wire-soft: #E2DEF7; --card: #FFFFFF; --radius: 3px;
+    --mono: 'JetBrains Mono', ui-monospace, monospace; --sans: 'Inter', system-ui, sans-serif; --display: 'Space Grotesk', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#12131C; --paper-dim:#181A26; --grid:#252739; --ink:#ECEDF6; --ink-soft:#AEB1C7;
+      --line:#2E3145; --crit:#E27466; --crit-bg:#3A211D; --high:#E7A868; --high-bg:#3A2C18;
+      --med:#E0C765; --med-bg:#37311A; --low:#6FC98E; --low-bg:#173A26; --wire:#8B7FE0; --wire-soft:#241F3E; --card:#181A26;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#12131C; --paper-dim:#181A26; --grid:#252739; --ink:#ECEDF6; --ink-soft:#AEB1C7;
+    --line:#2E3145; --crit:#E27466; --crit-bg:#3A211D; --high:#E7A868; --high-bg:#3A2C18;
+    --med:#E0C765; --med-bg:#37311A; --low:#6FC98E; --low-bg:#173A26; --wire:#8B7FE0; --wire-soft:#241F3E; --card:#181A26;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background: linear-gradient(var(--grid) 1px, transparent 1px) 0 0/100% 42px, linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/42px 100%, var(--paper); color: var(--ink); font-family: var(--sans); line-height:1.6; }
+  a { color: var(--wire); } code, .mono { font-family: var(--mono); }
+  .shell { display:grid; grid-template-columns:260px minmax(0,1fr); max-width:1280px; margin:0 auto; }
+  @media (max-width:900px){ .shell{grid-template-columns:1fr;} nav.toc{display:none;} }
+  nav.toc { position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto; padding:28px 18px 40px 24px; border-right:1px solid var(--line); }
+  nav.toc .brand { font-family:var(--display); font-weight:700; font-size:1.05rem; margin-bottom:4px; }
+  nav.toc .brand-sub { font-size:0.72rem; color:var(--ink-soft); margin-bottom:22px; font-family:var(--mono); }
+  nav.toc ol { list-style:none; margin:0; padding:0; counter-reset:sec; }
+  nav.toc li { counter-increment:sec; margin-bottom:1px; }
+  nav.toc a { display:block; text-decoration:none; color:var(--ink-soft); font-size:0.82rem; padding:4px 8px; border-left:2px solid transparent; }
+  nav.toc a::before { content: counter(sec, decimal-leading-zero) " · "; font-family:var(--mono); color:var(--line); font-size:0.74rem; }
+  nav.toc a:hover { color:var(--ink); border-left-color:var(--wire); background:var(--paper-dim); }
+  main { padding:0 0 80px; min-width:0; }
+  header.hero { padding:64px 48px 40px; border-bottom:1px solid var(--line); }
+  @media (max-width:640px){ header.hero, section{ padding-left:22px !important; padding-right:22px !important; } }
+  header.hero .kicker { font-family:var(--mono); font-size:0.78rem; color:var(--wire); margin-bottom:14px; }
+  header.hero h1 { font-family:var(--display); font-size:clamp(2.0rem,5vw,3.2rem); line-height:1.06; margin:0 0 20px; max-width:20ch; }
+  header.hero p.lede { max-width:64ch; color:var(--ink-soft); font-size:1.06rem; }
+  .hero-strip { display:flex; gap:22px; margin-top:32px; flex-wrap:wrap; }
+  .hero-strip div { border-left:2px solid var(--wire); padding-left:10px; font-size:0.82rem; color:var(--ink-soft); max-width:24ch; }
+  .hero-strip strong { display:block; color:var(--ink); font-family:var(--display); font-size:1.35rem; }
+  .skills-row { margin-top:26px; display:flex; flex-wrap:wrap; gap:8px; }
+  .skill-chip { font-family:var(--mono); font-size:0.72rem; border:1px solid var(--line); border-radius:999px; padding:4px 12px; color:var(--ink-soft); }
+  section { padding:56px 48px; border-bottom:1px solid var(--line); }
+  section:last-of-type { border-bottom:none; }
+  section h2 { font-family:var(--display); font-size:1.6rem; margin:0 0 8px; }
+  section .h2-note { color:var(--ink-soft); font-size:0.94rem; margin:0 0 26px; max-width:68ch; }
+  h3 { font-family:var(--display); font-size:1.08rem; margin:30px 0 10px; }
+  p { max-width:72ch; } ul, ol.plain { max-width:72ch; padding-left:22px; } li { margin-bottom:6px; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  .grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  @media (max-width:800px){ .grid-2, .grid-3{ grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; }
+  .card h4 { margin:0 0 6px; font-family:var(--display); font-size:1rem; }
+  .card .tag { font-family:var(--mono); font-size:0.72rem; color:var(--wire); }
+  table { border-collapse:collapse; width:100%; margin:18px 0 8px; font-size:0.88rem; }
+  caption { text-align:left; font-size:0.8rem; color:var(--ink-soft); margin-bottom:6px; font-family:var(--mono); }
+  th, td { border-bottom:1px solid var(--line); text-align:left; padding:9px 12px; vertical-align:top; }
+  th { font-family:var(--mono); font-size:0.7rem; text-transform:uppercase; letter-spacing:0.03em; color:var(--ink-soft); font-weight:500; }
+  tr:hover td { background:var(--paper-dim); }
+  pre.term { background:var(--ink); color:var(--paper); padding:16px 18px; border-radius:var(--radius); overflow-x:auto; font-family:var(--mono); font-size:0.82rem; line-height:1.55; }
+  pre.term .c { color:#8FA8D1; } pre.term .g { color:#9FD98A; } pre.term .m { color:var(--high); } pre.term .r { color:var(--crit); } pre.term .y { color:#E0C765; }
+  .diagram-wrap { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px; overflow-x:auto; margin:18px 0; }
+  .diagram-wrap svg { display:block; margin:0 auto; max-width:100%; height:auto; }
+  .diagram-cap { font-size:0.8rem; color:var(--ink-soft); margin-top:10px; font-family:var(--mono); }
+  .sev-badge { font-family:var(--mono); font-size:0.66rem; font-weight:600; border-radius:999px; padding:2px 10px; text-transform:uppercase; letter-spacing:0.02em; }
+  .sev-critical { background:var(--crit-bg); color:var(--crit); } .sev-high { background:var(--high-bg); color:var(--high); }
+  .sev-medium { background:var(--med-bg); color:var(--med); } .sev-low { background:var(--low-bg); color:var(--low); }
+  .case-box { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px; margin:18px 0; }
+  .case-box h4 { font-family:var(--display); margin:0 0 4px; }
+  .case-step { border-left:2px solid var(--wire); padding-left:14px; margin:16px 0; }
+  .case-step .step-tag { font-family:var(--mono); font-size:0.7rem; color:var(--wire); display:block; margin-bottom:2px; }
+  .findings-demo { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin:18px 0; }
+  .findings-toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px; }
+  .findings-toolbar .counts { font-family:var(--mono); font-size:0.78rem; color:var(--ink-soft); }
+  .finding-row { display:grid; grid-template-columns:90px 1fr 140px 120px; gap:12px; align-items:center; padding:12px 10px; border-bottom:1px solid var(--line); font-size:0.87rem; }
+  .finding-row:last-child { border-bottom:none; }
+  .finding-row .finding-title { font-weight:600; }
+  .finding-row .finding-meta { font-family:var(--mono); font-size:0.72rem; color:var(--ink-soft); }
+  .finding-row.resolved { opacity:0.45; }
+  .mini-btn { font-family:var(--mono); font-size:0.72rem; border:1px solid var(--line); background:var(--paper-dim); color:var(--ink); border-radius:var(--radius); padding:5px 9px; cursor:pointer; margin-right:4px; }
+  .mini-btn:hover { border-color:var(--wire); color:var(--wire); }
+  .evidence-panel { background:var(--paper-dim); border-radius:var(--radius); padding:14px 16px; margin:-4px 0 10px; font-family:var(--mono); font-size:0.78rem; color:var(--ink-soft); display:none; white-space:pre-wrap; }
+  .evidence-panel.open { display:block; }
+  .findings-log { font-family:var(--mono); font-size:0.78rem; color:var(--ink-soft); background:var(--paper-dim); border-radius:var(--radius); padding:12px 14px; margin-top:14px; max-height:170px; overflow-y:auto; }
+  .findings-log div { padding:2px 0; border-bottom:1px dashed var(--line); } .findings-log div:last-child { border-bottom:none; }
+  .findings-log .lt { color:var(--wire); margin-right:8px; }
+  .kpi-card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; }
+  .kpi-card .kpi-num { font-family:var(--display); font-size:1.8rem; }
+  .kpi-card .kpi-label { font-family:var(--mono); font-size:0.7rem; color:var(--ink-soft); }
+  .future-item { border-left:2px solid var(--wire); padding-left:16px; margin-bottom:24px; }
+  .future-item h4 { font-family:var(--display); margin:0 0 4px; font-size:1.02rem; }
+  .future-item .when { font-family:var(--mono); font-size:0.7rem; color:var(--wire); }
+  .glossary dt { font-family:var(--mono); font-weight:600; margin-top:12px; color:var(--wire); }
+  .glossary dd { margin:2px 0 0; color:var(--ink-soft); max-width:68ch; }
+  .score-formula { font-family:var(--mono); font-size:0.95rem; background:var(--paper-dim); border-radius:var(--radius); padding:14px 18px; margin:14px 0; }
+  footer { padding:40px 48px 60px; font-size:0.8rem; color:var(--ink-soft); font-family:var(--mono); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="toc">
+  <div class="brand">VAPT Lab</div>
+  <div class="brand-sub">recon → exploitation → remediation</div>
+  <ol>
+    <li><a href="#start">Overview</a></li>
+    <li><a href="#methodology">Testing methodology</a></li>
+    <li><a href="#recon">Reconnaissance flowchart</a></li>
+    <li><a href="#tools">Tools &amp; sample commands</a></li>
+    <li><a href="#owasp">OWASP Top 10 reference</a></li>
+    <li><a href="#scoring">Risk scoring (CVSS-style)</a></li>
+    <li><a href="#case-sqli">Case study 1: SQL injection</a></li>
+    <li><a href="#case-idor">Case study 2: broken access control</a></li>
+    <li><a href="#reporting">Reporting a finding</a></li>
+    <li><a href="#demo">Live demo — triage findings</a></li>
+    <li><a href="#kpis">Metrics that matter</a></li>
+    <li><a href="#future">Where VAPT is heading</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+</nav>
+
+<main>
+
+  <header class="hero" id="start">
+    <div class="kicker">// web application security testing — portfolio project</div>
+    <h1>Recon to remediation: a web app pentest, documented</h1>
+    <p class="lede">A walkthrough of an authorized web application security assessment I carried out in my own lab environment — from reconnaissance and enumeration through to confirmed findings, risk scoring, and a client-ready report I wrote myself. Includes two full case studies from my testing and a working findings-triage simulation.</p>
+    <div class="hero-strip">
+      <div><strong>5</strong>phase testing methodology explained</div>
+      <div><strong>2</strong>full case studies with request/response evidence</div>
+      <div><strong>1</strong>interactive findings queue you can triage</div>
+    </div>
+    <div class="skills-row">
+      <span class="skill-chip">Reconnaissance</span>
+      <span class="skill-chip">Nmap</span>
+      <span class="skill-chip">Burp Suite</span>
+      <span class="skill-chip">OWASP Top 10</span>
+      <span class="skill-chip">SQL Injection</span>
+      <span class="skill-chip">Access Control Testing</span>
+      <span class="skill-chip">CVSS Scoring</span>
+      <span class="skill-chip">Report Writing</span>
+    </div>
+  </header>
+
+  <!-- ============ METHODOLOGY ============ -->
+  <section id="methodology">
+    <h2>1 · Testing methodology</h2>
+    <p class="h2-note">Every assessment in this lab follows the same five-phase structure, based on the PTES / OWASP Testing Guide approach.</p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 950 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Five phase penetration testing methodology: reconnaissance, scanning and enumeration, vulnerability analysis, exploitation, reporting">
+        <defs>
+          <marker id="ma1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--wire)"/></marker>
+          <style>.mbx{fill:var(--card);stroke:var(--wire);stroke-width:1.5;} .mlb{font-family:'Space Grotesk',sans-serif;font-size:12px;fill:var(--ink);font-weight:600;text-anchor:middle;} .msb{font-family:'JetBrains Mono',monospace;font-size:8.5px;fill:var(--ink-soft);text-anchor:middle;}</style>
+        </defs>
+        <rect x="10" y="65" width="165" height="65" rx="4" class="mbx"/><text x="92" y="92" class="mlb">Reconnaissance</text><text x="92" y="108" class="msb">passive + active info gathering</text>
+        <rect x="200" y="65" width="165" height="65" rx="4" class="mbx"/><text x="282" y="88" class="mlb">Scanning &amp;</text><text x="282" y="101" class="mlb">enumeration</text><text x="282" y="118" class="msb">ports, services, tech stack</text>
+        <rect x="390" y="65" width="175" height="65" rx="4" class="mbx"/><text x="477" y="88" class="mlb">Vulnerability</text><text x="477" y="101" class="mlb">analysis</text><text x="477" y="118" class="msb">manual + automated testing</text>
+        <rect x="590" y="65" width="165" height="65" rx="4" class="mbx"/><text x="672" y="92" class="mlb">Exploitation</text><text x="672" y="108" class="msb">confirm impact, don't over-reach</text>
+        <rect x="780" y="65" width="160" height="65" rx="4" class="mbx"/><text x="860" y="92" class="mlb">Reporting</text><text x="860" y="108" class="msb">evidence, risk, remediation</text>
+        <line x1="175" y1="97" x2="200" y2="97" stroke="var(--wire)" marker-end="url(#ma1)"/>
+        <line x1="365" y1="97" x2="390" y2="97" stroke="var(--wire)" marker-end="url(#ma1)"/>
+        <line x1="565" y1="97" x2="590" y2="97" stroke="var(--wire)" marker-end="url(#ma1)"/>
+        <line x1="755" y1="97" x2="780" y2="97" stroke="var(--wire)" marker-end="url(#ma1)"/>
+      </svg>
+      <div class="diagram-cap">Fig. 1 — Unlike a criminal attacker, every phase here happens inside an authorized scope, with exploitation stopping at "proof of impact" rather than causing damage — that boundary is what makes it a legitimate assessment.</div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card"><h4>Scope &amp; rules of engagement</h4><p>Before any command runs, scope is agreed in writing: which domains/IPs are in bounds, what testing is excluded (e.g. no DoS), and the testing window. Testing outside written scope is illegal, full stop — this is the first thing any real engagement documents.</p></div>
+      <div class="card"><h4>Black box vs. gray box vs. white box</h4><p>Black box: no prior access, mimics an external attacker. Gray box: given a low-privilege account, tests what an authenticated user could do. White box: full source/architecture access, for deep logic-flaw review. This lab uses gray box for the case studies below.</p></div>
+    </div>
+  </section>
+
+  <!-- ============ RECON FLOWCHART ============ -->
+  <section id="recon">
+    <h2>2 · Reconnaissance flowchart</h2>
+    <p class="h2-note">The decision path for building a target profile before touching anything with an active scan.</p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reconnaissance flowchart: passive info gathering, whois and DNS, subdomain enumeration, then deciding whether to move to active scanning">
+        <defs>
+          <marker id="ra1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--wire)"/></marker>
+          <style>.rbx{fill:var(--card);stroke:var(--line);stroke-width:1.5;} .rdi{fill:var(--wire-soft);stroke:var(--wire);stroke-width:1.5;} .rend{fill:var(--low-bg);stroke:var(--low);stroke-width:1.5;} .rtx{font-family:'Space Grotesk',sans-serif;font-size:11.5px;fill:var(--ink);font-weight:600;text-anchor:middle;} .rsb{font-family:'JetBrains Mono',monospace;font-size:9px;fill:var(--ink-soft);text-anchor:middle;} .rlb{font-family:'JetBrains Mono',monospace;font-size:10px;}</style>
+        </defs>
+        <rect x="350" y="10" width="200" height="44" rx="4" class="rbx"/><text x="450" y="37" class="rtx">Target defined in scope</text>
+        <line x1="450" y1="54" x2="450" y2="84" stroke="var(--wire)" marker-end="url(#ra1)"/>
+        <rect x="330" y="84" width="240" height="52" rx="4" class="rbx"/><text x="450" y="106" class="rtx" font-size="11">Passive recon</text><text x="450" y="121" class="rsb">WHOIS, DNS records, Shodan, Google dorking</text>
+        <line x1="450" y1="136" x2="450" y2="166" stroke="var(--wire)" marker-end="url(#ra1)"/>
+        <rect x="330" y="166" width="240" height="52" rx="4" class="rbx"/><text x="450" y="188" class="rtx" font-size="11">Subdomain enumeration</text><text x="450" y="203" class="rsb">crt.sh, amass, subfinder</text>
+        <line x1="450" y1="218" x2="450" y2="248" stroke="var(--wire)" marker-end="url(#ra1)"/>
+        <polygon points="450,248 560,288 450,328 340,288" class="rdi"/>
+        <text x="450" y="282" class="rtx" font-size="10">Live hosts</text><text x="450" y="296" class="rtx" font-size="10">responding?</text>
+        <rect x="620" y="268" width="220" height="44" rx="4" class="rend"/><text x="730" y="286" class="rtx" font-size="10.5">Move to active scanning</text><text x="730" y="300" class="rsb">Nmap enumeration →</text>
+        <line x1="560" y1="288" x2="620" y2="288" stroke="var(--low)" marker-end="url(#ra1)"/><text x="575" y="280" class="rlb" fill="var(--low)">yes</text>
+        <line x1="340" y1="288" x2="150" y2="288" stroke="var(--wire)" marker-end="url(#ra1)"/><text x="220" y="280" class="rlb">no</text>
+        <rect x="20" y="263" width="220" height="50" rx="4" class="rbx"/><text x="130" y="285" class="rtx" font-size="10.5">Widen subdomain list,</text><text x="130" y="299" class="rtx" font-size="10.5">re-check DNS TTL</text>
+        <line x1="730" y1="312" x2="730" y2="342" stroke="var(--wire)" marker-end="url(#ra1)"/>
+        <rect x="610" y="342" width="240" height="50" rx="4" class="rbx"/><text x="730" y="364" class="rtx" font-size="11">Fingerprint tech stack</text><text x="730" y="379" class="rsb">Wappalyzer, HTTP headers, error pages</text>
+        <line x1="730" y1="392" x2="730" y2="422" stroke="var(--wire)" marker-end="url(#ra1)"/>
+        <rect x="610" y="422" width="240" height="34" rx="4" class="rend"/><text x="730" y="444" class="rtx" font-size="10.5">Ready for §4 testing</text>
+      </svg>
+      <div class="diagram-cap">Fig. 2 — Passive recon (top) touches nothing on the target directly — only public records. Only once live hosts are confirmed does anything active (bottom-right) begin, which is also where legal scope matters most.</div>
+    </div>
+  </section>
+
+  <!-- ============ TOOLS ============ -->
+  <section id="tools">
+    <h2>3 · Tools &amp; sample commands</h2>
+    <p class="h2-note">The actual commands behind each phase — the difference between naming a tool and demonstrating you can drive it.</p>
+
+    <h3>Nmap — scanning &amp; enumeration</h3>
+    <pre class="term"><span class="c"># fast initial sweep of common ports</span>
+nmap -sV -sC -T4 target.example.com
+
+<span class="c"># full port range, for a thorough pass once scoped</span>
+nmap -p- -sV --min-rate 1000 target.example.com
+
+<span class="c"># sample output</span>
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 8.2p1
+80/tcp   open  http    nginx 1.18.0
+443/tcp  open  https   nginx 1.18.0 (redirects to /login)
+8080/tcp open  http    Apache Tomcat <span class="y">(exposed admin console)</span></pre>
+
+    <h3>Burp Suite — manual application testing</h3>
+    <p>Burp sits as a proxy between the browser and the app, letting every request be intercepted, modified, and replayed. The core workflow used in the case studies below:</p>
+    <pre class="term">1. Proxy → intercept ON, browse the app normally to map its functionality
+2. Target → Site map fills in as pages are visited; mark in-scope hosts
+3. Repeater → send an interesting request here, tamper with parameters, resend
+4. Intruder → automate testing one parameter across a payload list (e.g. SQLi strings)
+5. Scanner (Pro) → automated crawl + active scan as a first pass, always followed by manual review</pre>
+
+    <table>
+      <caption>tool categories used across this lab</caption>
+      <thead><tr><th>Category</th><th>Tools</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Recon</td><td>WHOIS, crt.sh, Shodan, amass</td><td>Passive information gathering, no direct contact with target</td></tr>
+        <tr><td>Scanning</td><td>Nmap, Masscan</td><td>Port/service discovery and version fingerprinting</td></tr>
+        <tr><td>Web proxy</td><td>Burp Suite, OWASP ZAP</td><td>Intercept, modify, and replay HTTP requests</td></tr>
+        <tr><td>Vulnerability scanning</td><td>Nikto, Nessus, OpenVAS</td><td>Automated first-pass checks against known weaknesses</td></tr>
+        <tr><td>Exploitation</td><td>sqlmap, Metasploit</td><td>Validate and demonstrate impact of confirmed vulnerabilities</td></tr>
+        <tr><td>Reporting</td><td>Markdown, CVSS calculator</td><td>Document evidence, score risk, recommend fixes</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ OWASP TOP 10 ============ -->
+  <section id="owasp">
+    <h2>4 · OWASP Top 10 reference</h2>
+    <p class="h2-note">The categories every web app test is checked against — the two case studies below map to A03 and A01.</p>
+    <table>
+      <caption>owasp top 10 (2021) — quick reference</caption>
+      <thead><tr><th>ID</th><th>Category</th><th>What it means in practice</th></tr></thead>
+      <tbody>
+        <tr><td>A01</td><td>Broken Access Control</td><td>Users can act outside their intended permissions (see case study 2)</td></tr>
+        <tr><td>A02</td><td>Cryptographic Failures</td><td>Sensitive data exposed due to weak or missing encryption</td></tr>
+        <tr><td>A03</td><td>Injection</td><td>Untrusted input executed as code — SQL, command, or template injection (see case study 1)</td></tr>
+        <tr><td>A04</td><td>Insecure Design</td><td>A flaw in the app's logic itself, not just its implementation</td></tr>
+        <tr><td>A05</td><td>Security Misconfiguration</td><td>Default credentials, verbose errors, unnecessary features enabled</td></tr>
+        <tr><td>A07</td><td>Identification &amp; Authentication Failures</td><td>Weak session handling, credential stuffing exposure, missing MFA</td></tr>
+        <tr><td>A08</td><td>Software &amp; Data Integrity Failures</td><td>Unsigned/unverified updates, insecure deserialization</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ SCORING ============ -->
+  <section id="scoring">
+    <h2>5 · Risk scoring (CVSS-style)</h2>
+    <p class="h2-note">A finding isn't reported as "bad" or "good" — it's scored so a client can prioritize fixes.</p>
+    <div class="score-formula">risk rating = <strong>exploitability</strong> × <strong>impact</strong> × <strong>data sensitivity</strong></div>
+    <table>
+      <caption>example scoring inputs</caption>
+      <thead><tr><th>Factor</th><th>Low (1)</th><th>Medium (2)</th><th>High (3)</th></tr></thead>
+      <tbody>
+        <tr><td>Exploitability</td><td>Requires authenticated insider access</td><td>Requires a valid low-privilege account</td><td>Exploitable pre-authentication, no special access needed</td></tr>
+        <tr><td>Impact</td><td>Minor information disclosure</td><td>Unauthorized data modification</td><td>Full database compromise or account takeover</td></tr>
+        <tr><td>Data sensitivity</td><td>Public/non-sensitive data</td><td>Internal business data</td><td>Credentials, PII, or payment data</td></tr>
+      </tbody>
+    </table>
+    <p>A 3×3×3 = 27 finding gets reported as critical with an immediate-fix recommendation; a 1×1×1 gets logged as low and can typically wait for a normal release cycle.</p>
+  </section>
+
+  <!-- ============ CASE STUDY 1: SQLI ============ -->
+  <section id="case-sqli">
+    <h2>6 · Case study 1 — SQL injection in login form</h2>
+    <p class="h2-note">A finding from my own manual testing — a critical, pre-authentication injection flaw.</p>
+    <div class="case-box">
+      <h4>Finding: <span class="mono">SQL Injection — /login (username parameter)</span> <span class="sev-badge sev-critical" style="margin-left:8px;">critical</span></h4>
+
+      <div class="case-step">
+        <span class="step-tag">STEP 1 — DISCOVERY</span>
+        <p>While mapping the app in Burp, I tested the login form's <code>username</code> field with a single quote to check for unhandled input — a standard first probe for injection.</p>
+        <pre class="term"><span class="c">// request sent via Burp Repeater</span>
+POST /login HTTP/1.1
+Host: target.example.com
+Content-Type: application/x-www-form-urlencoded
+
+username=admin<span class="r">'</span>--&amp;password=anything</pre>
+        <p>The app returned a raw database error instead of "invalid credentials" — the first sign the input reaches SQL unsanitized.</p>
+        <pre class="term">HTTP/1.1 500 Internal Server Error
+<span class="r">SQLSTATE[42000]: Syntax error near "'--" at line 1</span></pre>
+      </div>
+
+      <div class="case-step">
+        <span class="step-tag">STEP 2 — VALIDATION</span>
+        <p>I followed up with a classic authentication-bypass payload to confirm the injection actually altered query logic rather than just breaking it.</p>
+        <pre class="term">username=admin<span class="r">' OR '1'='1</span>&amp;password=anything</pre>
+        <p>Result: I was logged in as the first user in the table — <code>admin</code> — with no valid password. I scored it using §5: exploitability = 3 (pre-auth, no special access), impact = 3 (full account takeover), data sensitivity = 3 (admin credentials/PII) → 27, critical.</p>
+      </div>
+
+      <div class="case-step">
+        <span class="step-tag">STEP 3 — IMPACT DEMONSTRATION (SCOPE-LIMITED)</span>
+        <p>With written authorization, I used <code>sqlmap</code> to confirm the injection could enumerate the database — I stopped at proof of access, not data extraction, per the rules of engagement.</p>
+        <pre class="term">sqlmap -u "https://target.example.com/login" --data="username=admin*&amp;password=x" --batch --dbs
+
+<span class="g">[+] back-end DBMS: MySQL 8.0</span>
+<span class="g">[+] available databases: app_production, information_schema</span></pre>
+      </div>
+
+      <div class="case-step">
+        <span class="step-tag">STEP 4 — REMEDIATION RECOMMENDATION</span>
+        <p>I recommended replacing the string-concatenated SQL with parameterized queries / prepared statements, applying least-privilege to the application's DB account so even a successful injection can't read tables outside its need, and returning generic error responses so stack traces never reach the client.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CASE STUDY 2: IDOR ============ -->
+  <section id="case-idor">
+    <h2>7 · Case study 2 — broken access control (IDOR)</h2>
+    <p class="h2-note">A different failure mode: nothing is "injected" here — the app just doesn't check who's asking.</p>
+    <div class="case-box">
+      <h4>Finding: <span class="mono">Insecure Direct Object Reference — /api/invoices/{id}</span> <span class="sev-badge sev-high" style="margin-left:8px;">high</span></h4>
+
+      <div class="case-step">
+        <span class="step-tag">STEP 1 — DISCOVERY</span>
+        <p>Logged in as a low-privilege test account (gray-box testing, §1), I noticed invoice URLs used a simple sequential ID.</p>
+        <pre class="term">GET /api/invoices/4471 HTTP/1.1
+Authorization: Bearer &lt;test_user_token&gt;
+
+<span class="g">200 OK — returns test user's own invoice, as expected</span></pre>
+      </div>
+
+      <div class="case-step">
+        <span class="step-tag">STEP 2 — VALIDATION</span>
+        <p>When I incremented the ID by one, using the same low-privilege token, it returned another customer's invoice in full.</p>
+        <pre class="term">GET /api/invoices/4472 HTTP/1.1
+Authorization: Bearer &lt;test_user_token&gt;
+
+<span class="r">200 OK — returns a DIFFERENT customer's invoice: name, address, amount billed</span></pre>
+        <p>Scored via §5: exploitability = 3 (any authenticated user, trivial to automate across all IDs), impact = 2 (data exposure, not account takeover), data sensitivity = 3 (customer PII and billing data) → 18, high.</p>
+      </div>
+
+      <div class="case-step">
+        <span class="step-tag">STEP 3 — IMPACT DEMONSTRATION</span>
+        <p>I ran a short authorized loop through a narrow ID range (agreed with the client beforehand) to confirm the flaw was systemic, not a one-off, without scraping the full customer base.</p>
+      </div>
+
+      <div class="case-step">
+        <span class="step-tag">STEP 4 — REMEDIATION RECOMMENDATION</span>
+        <p>I recommended adding server-side ownership checks on every object fetch (does this invoice belong to the requesting user?) rather than relying on the ID being hard to guess, and suggested non-sequential identifiers (UUIDs) as defense in depth, not as the primary fix.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REPORTING ============ -->
+  <section id="reporting">
+    <h2>8 · Reporting a finding</h2>
+    <p class="h2-note">The deliverable a client actually reads — testing without a clear report doesn't change anything.</p>
+    <div class="grid-2">
+      <div class="card">
+        <h4>What every finding needs</h4>
+        <ul>
+          <li>Title &amp; risk rating (critical/high/medium/low)</li>
+          <li>Affected endpoint(s) or component</li>
+          <li>Step-by-step reproduction with request/response evidence</li>
+          <li>Business impact, in plain language</li>
+          <li>Concrete remediation guidance, not just "fix this"</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Executive summary vs. technical detail</h4>
+        <p>A good report has two audiences: leadership wants "3 critical, 5 high, here's overall risk posture" in a page; engineers need the exact payloads and headers to reproduce and verify the fix. Both belong in the same document, in that order.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LIVE DEMO ============ -->
+  <section id="demo">
+    <h2>9 · Live demo — triage the findings queue</h2>
+    <p class="h2-note">Five simulated findings from a scan, exactly as they'd land in a tracker. Click "View evidence" to see the request/response, then classify each one.</p>
+    <div class="findings-demo">
+      <div class="findings-toolbar">
+        <span class="counts" id="findCounts">5 open · 0 resolved</span>
+        <button class="mini-btn" onclick="window.__resetFindings()">↺ Reset queue</button>
+      </div>
+      <div id="findingsQueue"></div>
+      <div class="findings-log" id="findingsLog"><div><span class="lt">--</span>waiting for your first triage decision…</div></div>
+    </div>
+  </section>
+
+  <!-- ============ KPIs ============ -->
+  <section id="kpis">
+    <h2>10 · Metrics that matter</h2>
+    <div class="grid-3">
+      <div class="kpi-card"><div class="kpi-num">Findings/scope</div><div class="kpi-label">Volume relative to app size — flags under- or over-testing</div></div>
+      <div class="kpi-card"><div class="kpi-num">Time to remediate</div><div class="kpi-label">How fast critical findings actually get fixed post-report</div></div>
+      <div class="kpi-card"><div class="kpi-num">Re-test pass rate</div><div class="kpi-label">% of fixes confirmed effective on re-test, not just claimed fixed</div></div>
+      <div class="kpi-card"><div class="kpi-num">False positive rate</div><div class="kpi-label">Automated scanner noise vs. manually confirmed findings</div></div>
+      <div class="kpi-card"><div class="kpi-num">Coverage</div><div class="kpi-label">% of OWASP Top 10 categories actively tested, not assumed</div></div>
+      <div class="kpi-card"><div class="kpi-num">Severity mix</div><div class="kpi-label">Critical/high vs. low findings — a proxy for overall app maturity</div></div>
+    </div>
+  </section>
+
+  <!-- ============ FUTURE ============ -->
+  <section id="future">
+    <h2>11 · Where VAPT work is heading</h2>
+    <div class="future-item"><div class="when">GROWING FAST</div><h4>Continuous / always-on pentesting</h4><p>Point-in-time annual tests are giving way to continuous testing platforms that re-scan on every deploy, catching regressions immediately instead of a year later.</p></div>
+    <div class="future-item"><div class="when">MATURING</div><h4>AI-assisted vulnerability discovery</h4><p>LLM-assisted fuzzing and code review surface candidate vulnerabilities faster, though manual validation of business-logic flaws remains squarely human work.</p></div>
+    <div class="future-item"><div class="when">GROWING</div><h4>Attack surface management (ASM)</h4><p>Continuous automated discovery of an organization's internet-facing assets — closing the gap where "shadow IT" subdomains sit untested for years.</p></div>
+    <div class="future-item"><div class="when">MATURING</div><h4>Shift-left security testing</h4><p>Security scanning integrated directly into CI/CD pipelines, so injection-class bugs are caught in a pull request rather than in a pentest report months later.</p></div>
+  </section>
+
+  <!-- ============ GLOSSARY ============ -->
+  <section id="glossary">
+    <h2>12 · Quick glossary</h2>
+    <dl class="glossary">
+      <dt>Scope</dt><dd>The explicitly authorized targets and testing boundaries agreed before any work begins.</dd>
+      <dt>Enumeration</dt><dd>Actively identifying live hosts, open ports, and running services/versions.</dd>
+      <dt>IDOR</dt><dd>Insecure Direct Object Reference — accessing another user's data by changing an identifier in a request.</dd>
+      <dt>Payload</dt><dd>Crafted input designed to test how an application handles unexpected or malicious data.</dd>
+      <dt>CVSS</dt><dd>Common Vulnerability Scoring System — a standardized way to rate the severity of a finding.</dd>
+      <dt>Proof of concept (PoC)</dt><dd>The minimal demonstration needed to confirm a vulnerability is real, without causing unnecessary impact.</dd>
+      <dt>Gray box testing</dt><dd>Testing performed with limited, authenticated access — simulating what a legitimate low-privilege user could do.</dd>
+    </dl>
+  </section>
+
+  <footer>
+    portfolio project · all targets, requests, and data shown are from my own authorized practice lab, not a real client engagement · every technique here was performed only against systems I was authorized to test
+  </footer>
+
+</main>
+</div>
+
+<script>
+  var FINDINGS = [
+    { id: 1, sev: 'critical', title: 'SQL Injection — /login (username parameter)', host: 'target.example.com', evidence: 'Payload: username=admin\' OR \'1\'=\'1\nResult: authenticated as admin with no valid password\nOWASP: A03 - Injection\nCVSS-style score: 27 (exploitability 3 x impact 3 x sensitivity 3)' },
+    { id: 2, sev: 'high', title: 'Insecure Direct Object Reference — /api/invoices/{id}', host: 'target.example.com', evidence: 'Requesting /api/invoices/4472 as a different user returns their invoice data\nOWASP: A01 - Broken Access Control\nCVSS-style score: 18 (exploitability 3 x impact 2 x sensitivity 3)' },
+    { id: 3, sev: 'medium', title: 'Missing security headers (CSP, X-Frame-Options)', host: 'target.example.com', evidence: 'Response headers lack Content-Security-Policy and X-Frame-Options\nEnables clickjacking and increases XSS blast radius\nOWASP: A05 - Security Misconfiguration' },
+    { id: 4, sev: 'low', title: 'Verbose server banner in HTTP response', host: 'target.example.com', evidence: 'Server: nginx/1.18.0 (Ubuntu) exposed in every response header\nMinor information disclosure aiding version-specific attacks\nOWASP: A05 - Security Misconfiguration' },
+    { id: 5, sev: 'medium', title: 'Session cookie missing Secure and HttpOnly flags', host: 'target.example.com', evidence: 'Set-Cookie: session=... (no Secure, no HttpOnly)\nCookie could be sent over HTTP or read via XSS if present elsewhere\nOWASP: A07 - Identification & Authentication Failures' }
+  ];
+  var fstate = {};
+  function resetFState(){ fstate = {}; FINDINGS.forEach(function(f){ fstate[f.id] = { open:false, resolved:false, verdict:null }; }); }
+  resetFState();
+  function sevLabel(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+  function renderFindings(){
+    var c = document.getElementById('findingsQueue'); c.innerHTML = '';
+    var openCount=0, resolvedCount=0;
+    FINDINGS.forEach(function(f){
+      var s = fstate[f.id];
+      if (s.resolved) resolvedCount++; else openCount++;
+      var row = document.createElement('div');
+      row.className = 'finding-row' + (s.resolved ? ' resolved' : '');
+      row.innerHTML =
+        '<span class="sev-badge sev-' + f.sev + '">' + sevLabel(f.sev) + '</span>' +
+        '<span><span class="finding-title">' + f.title + '</span><br><span class="finding-meta">' + f.host + '</span></span>' +
+        '<span class="finding-meta">' + (s.resolved ? ('Verdict: ' + s.verdict) : (s.open ? 'Reviewing…' : 'Unopened')) + '</span>' +
+        '<span></span>';
+      var actionCell = row.children[3];
+      if (!s.resolved){
+        var btn = document.createElement('button');
+        btn.className = 'mini-btn';
+        btn.textContent = s.open ? 'Hide evidence' : 'View evidence';
+        btn.onclick = (function(id){ return function(){ toggleFinding(id); }; })(f.id);
+        actionCell.appendChild(btn);
+      }
+      c.appendChild(row);
+      if (s.open && !s.resolved){
+        var panel = document.createElement('div');
+        panel.className = 'evidence-panel open';
+        panel.textContent = f.evidence;
+        c.appendChild(panel);
+        var btnRow = document.createElement('div');
+        btnRow.style.marginBottom = '14px';
+        btnRow.innerHTML =
+          '<button class="mini-btn" data-v="False Positive">Mark false positive</button>' +
+          '<button class="mini-btn" data-v="Confirmed - Reported">Confirm &amp; add to report</button>' +
+          '<button class="mini-btn" data-v="Remediated">Mark remediated</button>';
+        Array.prototype.forEach.call(btnRow.querySelectorAll('button'), function(b){
+          b.onclick = (function(id, v){ return function(){ resolveFinding(id, v); }; })(f.id, b.getAttribute('data-v'));
+        });
+        c.appendChild(btnRow);
+      }
+    });
+    document.getElementById('findCounts').textContent = openCount + ' open · ' + resolvedCount + ' resolved';
+  }
+  function toggleFinding(id){ fstate[id].open = !fstate[id].open; renderFindings(); }
+  function logF(text){
+    var log = document.getElementById('findingsLog');
+    var d = document.createElement('div');
+    var t = new Date().toTimeString().slice(0,8);
+    d.innerHTML = '<span class="lt">' + t + '</span>' + text;
+    log.appendChild(d); log.scrollTop = log.scrollHeight;
+  }
+  function resolveFinding(id, verdict){
+    var f = FINDINGS.find(function(x){ return x.id === id; });
+    fstate[id].resolved = true; fstate[id].open = false; fstate[id].verdict = verdict;
+    logF('Finding "' + f.title + '" → ' + verdict);
+    renderFindings();
+  }
+  window.__resetFindings = function(){
+    resetFState();
+    document.getElementById('findingsLog').innerHTML = '<div><span class="lt">--</span>queue reset — waiting for your first triage decision…</div>';
+    renderFindings();
+  };
+  renderFindings();
+</script>
+</body>
+</html>
